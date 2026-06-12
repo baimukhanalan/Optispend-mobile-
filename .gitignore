@@ -1,0 +1,32 @@
+node_modules/
+.expo/
+dist/
+web-build/
+.env
+.env.local
+.env.*.local
+
+# Native build artifacts
+android/
+ios/
+
+# Keys & certs
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+*.hbc
+
+# Logs
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
