@@ -64,3 +64,5 @@ export const shadows = {
     elevation: 12,
   },
 } as const;
+
+export const theme = { colors, spacing, radius, typography, shadows } as const;

@@ -1,42 +1,48 @@
 import { useEffect } from 'react';
+import { Platform } from 'react-native';
 import { Stack } from 'expo-router';
 import { useFonts } from 'expo-font';
-import * as SplashScreen from 'expo-splash-screen';
-import * as Notifications from 'expo-notifications';
-import * as Sentry from '@sentry/react-native';
 import { supabase } from '../src/lib/supabase';
 import { useAuthStore } from '../src/store/auth';
 
-SplashScreen.preventAutoHideAsync();
+// Native-only modules — guarded from web
+let SplashScreen: any = null;
+let Notifications: any = null;
+let Sentry: any = null;
 
-Sentry.init({
-  dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
-  enabled: !__DEV__,
-  tracesSampleRate: 0.2,
-});
+if (Platform.OS !== 'web') {
+  SplashScreen = require('expo-splash-screen');
+  Notifications = require('expo-notifications');
+  Sentry = require('@sentry/react-native');
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
+  SplashScreen.preventAutoHideAsync();
 
-export default Sentry.wrap(function RootLayout() {
+  Sentry.init({
+    dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+    enabled: !__DEV__,
+    tracesSampleRate: 0.2,
+  });
+
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+    }),
+  });
+}
+
+function RootLayout() {
   const { setSession, fetchUser, fetchProfile } = useAuthStore();
 
-  const [loaded] = useFonts({
-    // Add custom fonts here if needed
-  });
+  const [loaded] = useFonts({});
 
   useEffect(() => {
     if (!loaded) return;
-    SplashScreen.hideAsync();
+    SplashScreen?.hideAsync?.();
   }, [loaded]);
 
   useEffect(() => {
-    // Listen to auth state
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_, session) => {
       setSession(session);
       if (session) {
@@ -44,7 +50,6 @@ export default Sentry.wrap(function RootLayout() {
         await fetchProfile();
       }
     });
-
     return () => subscription.unsubscribe();
   }, []);
 
@@ -63,4 +68,9 @@ export default Sentry.wrap(function RootLayout() {
       <Stack.Screen name="settings" options={{ presentation: 'modal' }} />
     </Stack>
   );
-});
+}
+
+// Wrap with Sentry only on native
+export default Platform.OS !== 'web' && Sentry
+  ? Sentry.wrap(RootLayout)
+  : RootLayout;

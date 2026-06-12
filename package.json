@@ -13,6 +13,8 @@
   "dependencies": {
     "@expo/vector-icons": "^14.0.0",
     "@gorhom/bottom-sheet": "^4.6.1",
+    "@hookform/resolvers": "^3.6.0",
+    "@opentelemetry/api": "^1.9.1",
     "@react-native-async-storage/async-storage": "1.23.1",
     "@react-navigation/bottom-tabs": "^6.5.20",
     "@react-navigation/native": "^6.1.17",
@@ -32,7 +34,7 @@
     "expo-splash-screen": "~0.27.5",
     "expo-status-bar": "~1.12.1",
     "react": "18.2.0",
-    "@hookform/resolvers": "^3.6.0",
+    "react-dom": "18.2.0",
     "react-hook-form": "^7.52.0",
     "react-native": "0.74.3",
     "react-native-gesture-handler": "~2.16.1",
@@ -42,6 +44,7 @@
     "react-native-screens": "3.31.1",
     "react-native-svg": "15.2.0",
     "react-native-url-polyfill": "^2.0.0",
+    "react-native-web": "~0.19.10",
     "zod": "^3.23.8",
     "zustand": "^4.5.3"
   },
