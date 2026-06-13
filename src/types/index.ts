@@ -285,6 +285,23 @@ export interface MerchantSpend {
   transaction_count: number;
 }
 
+// ─── AI Chat ─────────────────────────────────────────────────────────────────
+export interface ChatSession {
+  id: string;
+  user_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  session_id: string;
+  user_id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  created_at: string;
+}
+
 // ─── AI Advisor ──────────────────────────────────────────────────────────────
 export interface AIAdvice {
   id: string;
