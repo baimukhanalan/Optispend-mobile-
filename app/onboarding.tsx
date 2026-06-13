@@ -1,2 +1,2 @@
-import OnboardingScreen from '../src/screens/onboarding/OnboardingScreen';
-export default OnboardingScreen;
+import OnboardingCarouselScreen from '../src/screens/onboarding/OnboardingCarouselScreen';
+export default OnboardingCarouselScreen;

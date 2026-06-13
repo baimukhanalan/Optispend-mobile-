@@ -1,76 +1,55 @@
 import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { Stack } from 'expo-router';
-import { useFonts } from 'expo-font';
+import {
+  useFonts,
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+} from '@expo-google-fonts/inter';
 import { supabase } from '../src/lib/supabase';
 import { useAuthStore } from '../src/store/auth';
 
-// Native-only modules — guarded from web
-let SplashScreen: any = null;
-let Notifications: any = null;
-let Sentry: any = null;
-
-if (Platform.OS !== 'web') {
-  SplashScreen = require('expo-splash-screen');
-  Notifications = require('expo-notifications');
-  Sentry = require('@sentry/react-native');
-
-  SplashScreen.preventAutoHideAsync();
-
-  Sentry.init({
-    dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
-    enabled: !__DEV__,
-    tracesSampleRate: 0.2,
-  });
-
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: true,
-    }),
-  });
-}
-
-function RootLayout() {
+export default function RootLayout() {
   const { setSession, fetchUser, fetchProfile } = useAuthStore();
 
-  const [loaded] = useFonts({});
+  const [fontsLoaded] = useFonts({
+    'Inter-Regular':  Inter_400Regular,
+    'Inter-Medium':   Inter_500Medium,
+    'Inter-SemiBold': Inter_600SemiBold,
+    'Inter-Bold':     Inter_700Bold,
+  });
 
   useEffect(() => {
-    if (!loaded) return;
-    SplashScreen?.hideAsync?.();
-  }, [loaded]);
-
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_, session) => {
-      setSession(session);
-      if (session) {
-        await fetchUser();
-        await fetchProfile();
-      }
-    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_, session) => {
+        setSession(session);
+        if (session) {
+          await fetchUser();
+          await fetchProfile();
+        }
+      },
+    );
     return () => subscription.unsubscribe();
   }, []);
 
-  if (!loaded) return null;
+  // On native, wait for fonts before rendering anything
+  if (!fontsLoaded && Platform.OS !== 'web') return null;
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    <Stack screenOptions={{ headerShown: false, animation: 'fade' }}>
+      <Stack.Screen name="index" />
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="onboarding" />
+      <Stack.Screen name="onboarding-profile" />
       <Stack.Screen name="receipt-scanner" options={{ presentation: 'fullScreenModal' }} />
-      <Stack.Screen name="statement-import" options={{ presentation: 'modal' }} />
-      <Stack.Screen name="add-expense" options={{ presentation: 'modal' }} />
-      <Stack.Screen name="pricing" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="statement-import"  options={{ presentation: 'modal' }} />
       <Stack.Screen name="statement-preview" options={{ presentation: 'modal' }} />
-      <Stack.Screen name="settings" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="add-expense"       options={{ presentation: 'modal' }} />
+      <Stack.Screen name="pricing"           options={{ presentation: 'modal' }} />
+      <Stack.Screen name="settings"          options={{ presentation: 'modal' }} />
     </Stack>
   );
 }
-
-// Wrap with Sentry only on native
-export default Platform.OS !== 'web' && Sentry
-  ? Sentry.wrap(RootLayout)
-  : RootLayout;

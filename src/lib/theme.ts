@@ -1,68 +1,120 @@
+// Design system — OptiSpend
+// Palette: near-black onboarding → clean white main app
+
 export const colors = {
-  background: '#F7F9FC',
-  card: '#FFFFFF',
-  text: '#172033',
-  secondary: '#667085',
-  accent: '#4F8CFF',
-  success: '#22C55E',
-  warning: '#F59E0B',
-  danger: '#EF4444',
-  border: '#E5EAF2',
-  softBlue: '#EAF2FF',
-  softGreen: '#EAFBF1',
-  softRed: '#FEF2F2',
-  softYellow: '#FEF3C7',
-  muted: '#94A3B8',
-  overlay: 'rgba(23, 32, 51, 0.6)',
+  // Onboarding (dark)
+  void:         '#000000',
+  ink:          '#0A0B10',
+  inkSurface:   '#111318',
+  inkBorder:    'rgba(255,255,255,0.08)',
+  inkText:      '#FFFFFF',
+  inkMuted:     'rgba(255,255,255,0.45)',
+
+  // Main app (light)
+  bg:           '#F5F5F7',
+  surface:      '#FFFFFF',
+  surfaceAlt:   '#F0F0F2',
+  border:       '#E4E4E7',
+  borderStrong: '#CACACE',
+
+  // Typography
+  text:         '#111111',
+  secondary:    '#6B6B6B',
+  muted:        '#A0A0A0',
+  placeholder:  '#C0C0C0',
+
+  // Brand
+  accent:       '#2563EB',
+  accentLight:  '#EFF6FF',
+  accentHover:  '#1D4ED8',
+
+  // Semantic
+  success:      '#16A34A',
+  successLight: '#F0FDF4',
+  danger:       '#DC2626',
+  dangerLight:  '#FEF2F2',
+  warning:      '#D97706',
+  warningLight: '#FFFBEB',
 } as const;
 
 export const spacing = {
-  xs: 4,
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 20,
-  xxl: 24,
-  xxxl: 32,
+  2:  2,
+  4:  4,
+  6:  6,
+  8:  8,
+  12: 12,
+  16: 16,
+  20: 20,
+  24: 24,
+  32: 32,
+  40: 40,
+  48: 48,
+  64: 64,
 } as const;
 
 export const radius = {
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 20,
-  xxl: 24,
-  full: 999,
+  xs:   4,
+  sm:   8,
+  md:   12,
+  lg:   16,
+  xl:   20,
+  xxl:  28,
+  full: 9999,
 } as const;
 
-export const typography = {
-  h1: { fontSize: 28, fontWeight: '600' as const, color: colors.text },
-  h2: { fontSize: 22, fontWeight: '600' as const, color: colors.text },
-  h3: { fontSize: 18, fontWeight: '600' as const, color: colors.text },
-  h4: { fontSize: 16, fontWeight: '600' as const, color: colors.text },
-  body: { fontSize: 15, fontWeight: '400' as const, color: colors.text },
-  bodySmall: { fontSize: 13, fontWeight: '400' as const, color: colors.secondary },
-  caption: { fontSize: 12, fontWeight: '400' as const, color: colors.muted },
-  label: { fontSize: 11, fontWeight: '500' as const, color: colors.secondary, letterSpacing: 0.5 },
-  amount: { fontSize: 32, fontWeight: '600' as const, color: colors.text, letterSpacing: -0.5 },
-  amountMd: { fontSize: 22, fontWeight: '600' as const, color: colors.text },
+export const fonts = {
+  regular:  'Inter-Regular',
+  medium:   'Inter-Medium',
+  semiBold: 'Inter-SemiBold',
+  bold:     'Inter-Bold',
 } as const;
 
-export const shadows = {
-  card: {
-    shadowColor: '#172033',
+export const type = {
+  d1:      { fontFamily: 'Inter-Bold',     fontSize: 44, letterSpacing: -1.5, lineHeight: 50 },
+  d2:      { fontFamily: 'Inter-Bold',     fontSize: 36, letterSpacing: -1.2, lineHeight: 42 },
+  h1:      { fontFamily: 'Inter-Bold',     fontSize: 28, letterSpacing: -0.8, lineHeight: 34 },
+  h2:      { fontFamily: 'Inter-SemiBold', fontSize: 22, letterSpacing: -0.5, lineHeight: 28 },
+  h3:      { fontFamily: 'Inter-SemiBold', fontSize: 18, letterSpacing: -0.3, lineHeight: 24 },
+  h4:      { fontFamily: 'Inter-SemiBold', fontSize: 16, letterSpacing: -0.2, lineHeight: 22 },
+  body:    { fontFamily: 'Inter-Regular',  fontSize: 15, lineHeight: 23 },
+  bodyMd:  { fontFamily: 'Inter-Medium',   fontSize: 15, lineHeight: 23 },
+  sm:      { fontFamily: 'Inter-Regular',  fontSize: 13, lineHeight: 19 },
+  smMd:    { fontFamily: 'Inter-Medium',   fontSize: 13, lineHeight: 19 },
+  xs:      { fontFamily: 'Inter-Regular',  fontSize: 11, lineHeight: 16 },
+  xsMd:    { fontFamily: 'Inter-Medium',   fontSize: 11, lineHeight: 16, letterSpacing: 0.4 },
+  mono:    { fontFamily: 'Inter-Regular',  fontSize: 14, letterSpacing: -0.2 },
+} as const;
+
+export const shadow = {
+  xs: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  sm: {
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowRadius: 6,
+    elevation: 2,
   },
-  modal: {
-    shadowColor: '#172033',
+  md: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  lg: {
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
+    shadowOpacity: 0.10,
     shadowRadius: 24,
-    elevation: 12,
+    elevation: 8,
   },
 } as const;
 
-export const theme = { colors, spacing, radius, typography, shadows } as const;
+// Legacy compat — screens that still use the old { theme } import
+export const theme = { colors, spacing, radius, fonts, type, shadow } as const;

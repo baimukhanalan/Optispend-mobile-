@@ -7,30 +7,22 @@ import { colors } from '../src/lib/theme';
 
 export default function Index() {
   const router = useRouter();
-  const { session, profile } = useAuthStore();
+  const { session } = useAuthStore();
 
   useEffect(() => {
     const check = async () => {
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
-
-      if (!currentSession) {
-        router.replace('/(auth)/sign-in');
-        return;
-      }
-
-      if (!profile?.onboarding_completed) {
+      const { data: { session: current } } = await supabase.auth.getSession();
+      if (current) {
+        router.replace('/(tabs)/');
+      } else {
         router.replace('/onboarding');
-        return;
       }
-
-      router.replace('/(tabs)');
     };
-
     check();
   }, []);
 
   return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background }}>
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#000000' }}>
       <ActivityIndicator color={colors.accent} size="large" />
     </View>
   );

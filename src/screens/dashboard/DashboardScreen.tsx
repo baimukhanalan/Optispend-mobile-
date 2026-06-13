@@ -7,32 +7,69 @@ import {
   StyleSheet,
   RefreshControl,
   Animated,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
-import { colors, spacing, typography } from '../../lib/theme';
+import Svg, { Path, Rect, Line, Circle } from 'react-native-svg';
+import { colors, type as t, radius, shadow, spacing } from '../../lib/theme';
 import { formatMoney, formatRelativeDate } from '../../lib/format';
 import { useAuthStore } from '../../store/auth';
 import { useExpensesStore } from '../../store/expenses';
-import { Card } from '../../components/ui/Card';
-import { CountUp } from '../../components/ui/CountUp';
-import { CardSkeleton, TransactionSkeleton } from '../../components/ui/SkeletonLoader';
-import { CATEGORY_LABELS, CATEGORY_COLORS, Expense } from '../../types';
+import { CATEGORY_LABELS, Expense } from '../../types';
+
+// ─── Quick action icons ───────────────────────────────────────────────────────
+const PlusIcon = () => (
+  <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+    <Path d="M12 5v14M5 12h14" stroke={colors.accent} strokeWidth={2} strokeLinecap="round" />
+  </Svg>
+);
+const CameraIcon = () => (
+  <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+    <Path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"
+      stroke={colors.success} strokeWidth={1.6} strokeLinejoin="round" />
+    <Circle cx={12} cy={13} r={4} stroke={colors.success} strokeWidth={1.6} />
+  </Svg>
+);
+const FileIcon = () => (
+  <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+    <Path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+      stroke={colors.warning} strokeWidth={1.6} strokeLinejoin="round" />
+    <Line x1="9" y1="13" x2="15" y2="13" stroke={colors.warning} strokeWidth={1.6} strokeLinecap="round" />
+    <Line x1="9" y1="17" x2="13" y2="17" stroke={colors.warning} strokeWidth={1.6} strokeLinecap="round" />
+  </Svg>
+);
+const ChartIcon = () => (
+  <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+    <Rect x="2" y="2" width="20" height="20" rx="3" stroke={colors.danger} strokeWidth={1.6} />
+    <Path d="M7 16l4-5 3 3 4-6" stroke={colors.danger} strokeWidth={1.6}
+      strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
 
 const QUICK_ACTIONS = [
-  { icon: '＋', label: 'Добавить', color: colors.softBlue, iconColor: colors.accent, route: '/add-expense' },
-  { icon: '📷', label: 'Чек', color: colors.softGreen, iconColor: colors.success, route: '/receipt-scanner' },
-  { icon: '📄', label: 'Выписка', color: colors.softYellow, iconColor: colors.warning, route: '/statement-import' },
-  { icon: '📊', label: 'Отчет', color: '#FEE2E2', iconColor: colors.danger, route: '/(tabs)/reports' },
+  { label: 'Добавить', bg: colors.accentLight,  Icon: PlusIcon,   route: '/add-expense' },
+  { label: 'Чек',      bg: colors.successLight, Icon: CameraIcon, route: '/receipt-scanner' },
+  { label: 'Выписка',  bg: colors.warningLight, Icon: FileIcon,   route: '/statement-import' },
+  { label: 'Отчет',    bg: colors.dangerLight,  Icon: ChartIcon,  route: '/(tabs)/reports' },
 ];
 
+// ─── Category dot colors (no emoji) ──────────────────────────────────────────
+const CAT_COLORS: Record<string, string> = {
+  food_delivery: '#EF4444', groceries: '#22C55E', transport: '#3B82F6',
+  taxi: '#8B5CF6', entertainment: '#EC4899', subscriptions: '#0EA5E9',
+  cafe_restaurants: '#F59E0B', health: '#14B8A6', education: '#6366F1',
+  shopping: '#F97316', utilities: '#84CC16', housing: '#06B6D4',
+  debt_payment: '#EF4444', savings: '#10B981', family: '#8B5CF6',
+};
+
+// ─── Main screen ──────────────────────────────────────────────────────────────
 export default function DashboardScreen() {
   const router = useRouter();
   const { user, profile } = useAuthStore();
-  const { expenses, todayExpenses, loading, fetchExpenses, fetchDailySnapshot, dailySnapshot, getSafeToSpend } = useExpensesStore();
+  const { expenses, todayExpenses, loading, fetchExpenses, fetchDailySnapshot, getSafeToSpend } = useExpensesStore();
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(20)).current;
+  const slideAnim = useRef(new Animated.Value(16)).current;
   const [refreshing, setRefreshing] = React.useState(false);
 
   useEffect(() => {
@@ -41,8 +78,8 @@ export default function DashboardScreen() {
       fetchDailySnapshot(user.id);
     }
     Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
-      Animated.timing(slideAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 360, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 0, duration: 360, useNativeDriver: true }),
     ]).start();
   }, [user]);
 
@@ -52,23 +89,21 @@ export default function DashboardScreen() {
     setRefreshing(false);
   }, [user]);
 
-  const monthlyIncome = profile?.monthly_income ?? 0;
-  const monthlyFixed = profile?.monthly_fixed_expenses ?? 0;
-  const safeToSpend = getSafeToSpend(monthlyIncome, monthlyFixed);
-  const spentToday = todayExpenses.reduce((s, e) => s + e.amount, 0);
-  const dailyBudget = monthlyIncome > 0 ? (monthlyIncome - monthlyFixed) / 30 : 0;
-  const spentPercent = dailyBudget > 0 ? Math.min((spentToday / dailyBudget) * 100, 100) : 0;
+  const monthlyIncome  = profile?.monthly_income ?? 0;
+  const monthlyFixed   = profile?.monthly_fixed_expenses ?? 0;
+  const safeToSpend    = getSafeToSpend(monthlyIncome, monthlyFixed);
+  const spentToday     = todayExpenses.reduce((s, e) => s + e.amount, 0);
+  const dailyBudget    = monthlyIncome > 0 ? (monthlyIncome - monthlyFixed) / 30 : 0;
+  const spentPercent   = dailyBudget > 0 ? Math.min((spentToday / dailyBudget) * 100, 100) : 0;
 
   const firstName = user?.full_name?.split(' ')[0] ?? 'Пользователь';
-  const initials = user?.full_name
-    ?.split(' ')
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2) ?? 'ФИ';
+  const initials  = user?.full_name
+    ?.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2) ?? '--';
 
-  const today = new Date();
+  const today   = new Date();
   const dateStr = today.toLocaleDateString('ru-KZ', { weekday: 'long', day: 'numeric', month: 'long' });
+
+  const recentExpenses = expenses.slice(0, 6);
 
   return (
     <ScrollView
@@ -78,127 +113,134 @@ export default function DashboardScreen() {
       showsVerticalScrollIndicator={false}
     >
       <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
-        {/* Header */}
+
+        {/* ── Header ── */}
         <View style={styles.header}>
           <View>
             <Text style={styles.dateLabel}>{dateStr}</Text>
             <Text style={styles.greeting}>Привет, {firstName}</Text>
           </View>
           <TouchableOpacity
-            onPress={() => router.push('/settings')}
             style={styles.avatar}
-            activeOpacity={0.7}
+            onPress={() => router.push('/settings')}
+            activeOpacity={0.75}
           >
             <Text style={styles.avatarText}>{initials}</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Alert if limit exceeded */}
+        {/* ── Overspend warning ── */}
         {spentPercent >= 90 && (
-          <TouchableOpacity
-            style={styles.alertBanner}
-            onPress={() => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning); router.push('/(tabs)/leaks'); }}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.alertIcon}>⚠️</Text>
+          <View style={styles.alertBanner}>
+            <View style={styles.alertDot} />
             <Text style={styles.alertText}>Дневной лимит почти исчерпан</Text>
-            <Text style={styles.alertAction}>→</Text>
-          </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/leaks')}>
+              <Text style={styles.alertLink}>Детали</Text>
+            </TouchableOpacity>
+          </View>
         )}
 
-        {/* Balance card */}
+        {/* ── Balance card ── */}
         <View style={styles.balanceCard}>
-          <Text style={styles.balanceLabel}>Можно потратить сегодня</Text>
-          <CountUp value={safeToSpend} currency="₸" style={styles.balanceAmount} duration={1000} />
-          <View style={styles.balanceRow}>
-            <Text style={styles.balanceSub}>Потрачено: {formatMoney(spentToday)}</Text>
-            <View style={styles.percentBadge}>
-              <Text style={styles.percentText}>{Math.round(spentPercent)}%</Text>
-            </View>
-          </View>
+          <Text style={styles.balanceSuperLabel}>МОЖНО ПОТРАТИТЬ СЕГОДНЯ</Text>
+          <Text style={styles.balanceAmount}>
+            {formatMoney(safeToSpend)}
+          </Text>
+
           <View style={styles.progressWrap}>
-            <View
-              style={[
-                styles.progressFill,
-                { width: `${spentPercent}%` as any },
-                spentPercent >= 90 && { backgroundColor: '#FFB347' },
-              ]}
-            />
+            <View style={[styles.progressFill, {
+              width: `${spentPercent}%` as any,
+              backgroundColor: spentPercent >= 90
+                ? 'rgba(251,191,36,0.9)'
+                : 'rgba(255,255,255,0.85)',
+            }]} />
+          </View>
+
+          <View style={styles.balanceMeta}>
+            <Text style={styles.balanceMetaText}>
+              Потрачено {formatMoney(spentToday)}
+            </Text>
+            <Text style={styles.balanceMetaText}>
+              {Math.round(spentPercent)}% лимита
+            </Text>
           </View>
         </View>
 
-        {/* Quick actions */}
-        <View style={styles.quickActions}>
-          {QUICK_ACTIONS.map((qa) => (
+        {/* ── Quick actions ── */}
+        <View style={styles.quickRow}>
+          {QUICK_ACTIONS.map(({ label, bg, Icon, route }) => (
             <TouchableOpacity
-              key={qa.label}
-              style={styles.qaBtn}
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(qa.route as any); }}
+              key={label}
+              style={[styles.qaCard, { backgroundColor: bg }]}
+              onPress={() => router.push(route as any)}
               activeOpacity={0.75}
             >
-              <View style={[styles.qaIcon, { backgroundColor: qa.color }]}>
-                <Text style={{ fontSize: 18 }}>{qa.icon}</Text>
-              </View>
-              <Text style={styles.qaLabel}>{qa.label}</Text>
+              <View style={styles.qaIconWrap}><Icon /></View>
+              <Text style={styles.qaLabel}>{label}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* Safe to save card */}
-        {profile && monthlyIncome > 0 && (
-          <Card variant="success" style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <View style={styles.savingsIcon}>
-              <Text style={{ fontSize: 20 }}>🐷</Text>
-            </View>
+        {/* ── Monthly savings callout ── */}
+        {monthlyIncome > 0 && (
+          <View style={styles.savingsCard}>
             <View>
-              <Text style={styles.savingsLabel}>Можно безопасно отложить</Text>
-              <CountUp
-                value={Math.max(0, monthlyIncome * 0.2 - spentToday * 0.1)}
-                currency="₸"
-                style={styles.savingsAmount}
-                duration={1300}
-              />
+              <Text style={styles.savingsLabel}>Безопасно отложить</Text>
+              <Text style={styles.savingsAmount}>
+                {formatMoney(Math.max(0, monthlyIncome * 0.2 - spentToday * 0.1))}
+              </Text>
             </View>
-          </Card>
+            <View style={styles.savingsTag}>
+              <Text style={styles.savingsTagText}>20% правило</Text>
+            </View>
+          </View>
         )}
 
-        {/* Recent transactions */}
-        <Card>
+        {/* ── Recent transactions ── */}
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Последние операции</Text>
           {loading ? (
-            <>
-              <TransactionSkeleton />
-              <TransactionSkeleton />
-              <TransactionSkeleton />
-            </>
-          ) : expenses.slice(0, 5).length === 0 ? (
+            <View style={styles.skeleton}>
+              {[1, 2, 3].map((i) => (
+                <View key={i} style={styles.skeletonRow}>
+                  <View style={styles.skeletonDot} />
+                  <View style={{ flex: 1, gap: 6 }}>
+                    <View style={[styles.skeletonLine, { width: '60%' }]} />
+                    <View style={[styles.skeletonLine, { width: '35%', opacity: 0.5 }]} />
+                  </View>
+                  <View style={[styles.skeletonLine, { width: 60 }]} />
+                </View>
+              ))}
+            </View>
+          ) : recentExpenses.length === 0 ? (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyIcon}>📋</Text>
-              <Text style={styles.emptyText}>Операций пока нет.</Text>
-              <Text style={styles.emptySubtext}>Добавьте первый расход или загрузите выписку.</Text>
+              <Text style={styles.emptyTitle}>Нет операций</Text>
+              <Text style={styles.emptyBody}>Добавьте расход или загрузите банковскую выписку.</Text>
             </View>
           ) : (
-            expenses.slice(0, 5).map((expense) => (
+            recentExpenses.map((expense) => (
               <TransactionRow key={expense.id} expense={expense} />
             ))
           )}
-          {expenses.length > 5 && (
-            <TouchableOpacity onPress={() => router.push('/(tabs)/expenses')} style={styles.seeAll}>
-              <Text style={styles.seeAllText}>Все операции →</Text>
+          {expenses.length > 6 && (
+            <TouchableOpacity style={styles.seeAll} onPress={() => router.push('/(tabs)/reports')}>
+              <Text style={styles.seeAllText}>Все операции</Text>
             </TouchableOpacity>
           )}
-        </Card>
+        </View>
+
       </Animated.View>
     </ScrollView>
   );
 }
 
+// ─── Transaction row ──────────────────────────────────────────────────────────
 function TransactionRow({ expense }: { expense: Expense }) {
-  const color = CATEGORY_COLORS[expense.category] ?? colors.muted;
+  const dot = CAT_COLORS[expense.category] ?? colors.muted;
   return (
     <View style={styles.txRow}>
-      <View style={[styles.txIcon, { backgroundColor: color + '22' }]}>
-        <Text style={{ fontSize: 16, color }}>{getCategoryEmoji(expense.category)}</Text>
+      <View style={[styles.txDot, { backgroundColor: dot + '22', borderColor: dot + '44' }]}>
+        <View style={[styles.txDotInner, { backgroundColor: dot }]} />
       </View>
       <View style={styles.txInfo}>
         <Text style={styles.txName} numberOfLines={1}>
@@ -207,84 +249,179 @@ function TransactionRow({ expense }: { expense: Expense }) {
         <Text style={styles.txCat}>{CATEGORY_LABELS[expense.category]}</Text>
       </View>
       <View style={styles.txRight}>
-        <Text style={[styles.txAmount, expense.category === 'food_delivery' || expense.category === 'taxi' ? { color: colors.danger } : {}]}>
-          −{formatMoney(expense.amount)}
-        </Text>
+        <Text style={styles.txAmount}>−{formatMoney(expense.amount)}</Text>
         <Text style={styles.txDate}>{formatRelativeDate(expense.date)}</Text>
       </View>
     </View>
   );
 }
 
-function getCategoryEmoji(cat: string): string {
-  const map: Record<string, string> = {
-    food_delivery: '🛵', groceries: '🛒', transport: '🚌',
-    taxi: '🚗', entertainment: '🎬', subscriptions: '📱',
-    cafe_restaurants: '☕', health: '💊', education: '📚',
-    shopping: '🛍', utilities: '💡', housing: '🏠',
-    debt_payment: '💳', savings: '🐷', family: '👨‍👩‍👧',
-  };
-  return map[cat] ?? '💰';
-}
-
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
-  content: { padding: 16, paddingBottom: 100 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  dateLabel: { ...typography.caption, marginBottom: 2 },
-  greeting: { ...typography.h3 },
+  root: { flex: 1, backgroundColor: colors.bg },
+  content: { padding: 20, paddingBottom: 110 },
+
+  // Header
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingTop: Platform.OS === 'ios' ? 12 : 20,
+  },
+  dateLabel: {
+    ...t.sm,
+    color: colors.muted,
+    textTransform: 'capitalize',
+    marginBottom: 2,
+  },
+  greeting: { ...t.h2, color: colors.text },
   avatar: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: colors.softBlue,
+    width: 42, height: 42, borderRadius: 21,
+    backgroundColor: colors.accentLight,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5, borderColor: colors.accent + '30',
+  },
+  avatarText: { ...t.smMd, color: colors.accent },
+
+  // Alert
+  alertBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: colors.warningLight,
+    borderRadius: radius.md, paddingVertical: 10, paddingHorizontal: 14,
+    marginBottom: 14, borderWidth: 1, borderColor: '#FDE68A',
+  },
+  alertDot: {
+    width: 7, height: 7, borderRadius: 4,
+    backgroundColor: colors.warning,
+  },
+  alertText: { ...t.sm, flex: 1, color: '#92400E' },
+  alertLink: { ...t.smMd, color: colors.warning },
+
+  // Balance card
+  balanceCard: {
+    backgroundColor: colors.accent,
+    borderRadius: radius.xl,
+    padding: 22,
+    marginBottom: 14,
+    ...shadow.md,
+  },
+  balanceSuperLabel: {
+    ...t.xsMd,
+    color: 'rgba(255,255,255,0.55)',
+    letterSpacing: 1.5,
+    marginBottom: 10,
+  },
+  balanceAmount: {
+    ...t.d2,
+    color: '#FFFFFF',
+    marginBottom: 18,
+  },
+  progressWrap: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: radius.full, height: 4,
+    overflow: 'hidden', marginBottom: 10,
+  },
+  progressFill: {
+    height: '100%', borderRadius: radius.full,
+  },
+  balanceMeta: {
+    flexDirection: 'row', justifyContent: 'space-between',
+  },
+  balanceMetaText: {
+    ...t.sm, color: 'rgba(255,255,255,0.65)',
+  },
+
+  // Quick actions
+  quickRow: {
+    flexDirection: 'row', gap: 8, marginBottom: 14,
+  },
+  qaCard: {
+    flex: 1, borderRadius: radius.lg,
+    paddingVertical: 14, alignItems: 'center', gap: 7,
+  },
+  qaIconWrap: {
+    width: 36, height: 36, borderRadius: radius.md,
+    backgroundColor: 'rgba(255,255,255,0.7)',
     alignItems: 'center', justifyContent: 'center',
   },
-  avatarText: { fontSize: 14, fontWeight: '600', color: colors.accent },
-  alertBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: colors.softYellow, borderWidth: 1, borderColor: '#FDE68A',
-    borderRadius: 12, padding: 12, marginBottom: 12,
+  qaLabel: { ...t.xs, color: colors.secondary },
+
+  // Savings
+  savingsCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+    borderWidth: 1, borderColor: colors.border,
+    ...shadow.xs,
   },
-  alertIcon: { fontSize: 16 },
-  alertText: { flex: 1, fontSize: 13, color: colors.text },
-  alertAction: { fontSize: 14, color: '#B45309', fontWeight: '600' },
-  balanceCard: {
-    backgroundColor: colors.accent, borderRadius: 20, padding: 20, marginBottom: 12,
+  savingsLabel: { ...t.sm, color: colors.secondary, marginBottom: 3 },
+  savingsAmount: { ...t.h3, color: colors.success },
+  savingsTag: {
+    backgroundColor: colors.successLight,
+    borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 5,
   },
-  balanceLabel: { fontSize: 12, color: 'rgba(255,255,255,0.82)', marginBottom: 4 },
-  balanceAmount: { fontSize: 32, fontWeight: '600', color: '#fff', letterSpacing: -0.5 },
-  balanceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
-  balanceSub: { fontSize: 13, color: 'rgba(255,255,255,0.76)' },
-  percentBadge: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
-  percentText: { fontSize: 12, color: '#fff', fontWeight: '500' },
-  progressWrap: { backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 8, height: 5, marginTop: 10, overflow: 'hidden' },
-  progressFill: { height: '100%', borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.9)' },
-  quickActions: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  qaBtn: {
-    flex: 1, alignItems: 'center', gap: 6,
-    backgroundColor: colors.card, borderRadius: 13,
-    borderWidth: 1, borderColor: colors.border, paddingVertical: 12, paddingHorizontal: 4,
+  savingsTagText: { ...t.xsMd, color: colors.success },
+
+  // Recent section
+  section: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: 16,
+    borderWidth: 1, borderColor: colors.border,
+    ...shadow.xs,
   },
-  qaIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  qaLabel: { fontSize: 11, fontWeight: '500', color: colors.text },
-  savingsIcon: {
-    width: 44, height: 44, borderRadius: 12,
-    backgroundColor: colors.success, alignItems: 'center', justifyContent: 'center',
+  sectionTitle: {
+    ...t.h4, color: colors.text, marginBottom: 16,
   },
-  savingsLabel: { fontSize: 12, color: '#14532D', marginBottom: 2 },
-  savingsAmount: { fontSize: 20, fontWeight: '600', color: '#14532D' },
-  sectionTitle: { ...typography.label, marginBottom: 12, textTransform: 'uppercase' },
-  txRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
-  txIcon: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+
+  // Transaction row
+  txRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 11,
+    borderBottomWidth: 1, borderBottomColor: colors.border,
+  },
+  txDot: {
+    width: 38, height: 38, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1,
+  },
+  txDotInner: {
+    width: 10, height: 10, borderRadius: 5,
+  },
   txInfo: { flex: 1 },
-  txName: { fontSize: 14, fontWeight: '500', color: colors.text },
-  txCat: { fontSize: 12, color: colors.muted, marginTop: 1 },
+  txName: { ...t.bodyMd, color: colors.text },
+  txCat: { ...t.sm, color: colors.muted, marginTop: 1 },
   txRight: { alignItems: 'flex-end' },
-  txAmount: { fontSize: 14, fontWeight: '500', color: colors.text },
-  txDate: { fontSize: 11, color: colors.muted, marginTop: 2 },
-  emptyState: { alignItems: 'center', paddingVertical: 24 },
-  emptyIcon: { fontSize: 36, marginBottom: 8 },
-  emptyText: { ...typography.body, marginBottom: 4 },
-  emptySubtext: { ...typography.bodySmall, textAlign: 'center' },
-  seeAll: { paddingTop: 12, alignItems: 'center' },
-  seeAllText: { fontSize: 13, fontWeight: '500', color: colors.accent },
+  txAmount: { ...t.bodyMd, color: colors.text },
+  txDate: { ...t.xs, color: colors.muted, marginTop: 2 },
+
+  // Empty state
+  emptyState: { paddingVertical: 28, alignItems: 'center' },
+  emptyTitle: { ...t.h4, color: colors.secondary, marginBottom: 6 },
+  emptyBody: { ...t.sm, color: colors.muted, textAlign: 'center', maxWidth: 220 },
+
+  // Skeleton
+  skeleton: { gap: 0 },
+  skeletonRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 14,
+    borderBottomWidth: 1, borderBottomColor: colors.border,
+  },
+  skeletonDot: {
+    width: 38, height: 38, borderRadius: 12,
+    backgroundColor: colors.surfaceAlt,
+  },
+  skeletonLine: {
+    height: 10, borderRadius: 5,
+    backgroundColor: colors.surfaceAlt,
+  },
+
+  // See all
+  seeAll: { paddingTop: 14, alignItems: 'center' },
+  seeAllText: { ...t.smMd, color: colors.accent },
 });
