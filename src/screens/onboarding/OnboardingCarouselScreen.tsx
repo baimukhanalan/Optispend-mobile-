@@ -20,12 +20,14 @@ import Svg, {
 } from 'react-native-svg';
 import { colors, type as t, radius } from '@/lib/theme';
 import { supabase } from '@/lib/supabase';
+import { useT, useLangStore } from '@/lib/i18n';
+import type { Lang } from '@/store/lang';
 
-const SLIDE_COUNT   = 4; // 3 feature + 1 auth
-const MAX_SLIDE_W   = 480; // cap for tablet / desktop
-const ILLUS_ASPECT  = 320 / 260; // viewBox aspect ratio
+const SLIDE_COUNT   = 4;
+const MAX_SLIDE_W   = 480;
+const ILLUS_ASPECT  = 320 / 260;
 
-// ─── SVG Illustrations (width-aware) ─────────────────────────────────────────
+// ─── SVG Illustrations ────────────────────────────────────────────────────────
 
 function IllustrationControl({ w }: { w: number }) {
   const h = w / ILLUS_ASPECT;
@@ -126,27 +128,6 @@ function IllustrationBudget({ w }: { w: number }) {
   );
 }
 
-const SLIDES = [
-  {
-    eyebrow: 'ФИНАНСЫ',
-    headline: 'Деньги\nпод контролем',
-    body: 'Каждая трата зафиксирована.\nВидите баланс в реальном времени.',
-    Illus: IllustrationControl,
-  },
-  {
-    eyebrow: 'ПРОЗРАЧНОСТЬ',
-    headline: 'Видите,\nкуда уходят',
-    body: 'Kaspi, Halyk, Forte — импорт\nвыписки за 10 секунд.',
-    Illus: IllustrationBreakdown,
-  },
-  {
-    eyebrow: 'ПЛАНИРОВАНИЕ',
-    headline: 'Бюджет,\nкоторый держит',
-    body: 'Лимиты по категориям.\nУведомление до того, как превысили.',
-    Illus: IllustrationBudget,
-  },
-];
-
 // ─── Google icon ──────────────────────────────────────────────────────────────
 const GoogleIcon = () => (
   <Svg width={20} height={20} viewBox="0 0 18 18">
@@ -166,28 +147,70 @@ const Dots = ({ current }: { current: number }) => (
   </View>
 );
 
+// ─── Language picker ──────────────────────────────────────────────────────────
+const LANG_OPTS: { code: Lang; label: string }[] = [
+  { code: 'ru', label: 'RU' },
+  { code: 'kk', label: 'ҚЗ' },
+  { code: 'en', label: 'EN' },
+];
+
+function LangPicker() {
+  const { lang, setLang } = useLangStore();
+  return (
+    <View style={lp.wrap}>
+      {LANG_OPTS.map(({ code, label }) => (
+        <TouchableOpacity
+          key={code}
+          style={[lp.pill, lang === code && lp.pillOn]}
+          onPress={() => setLang(code)}
+          hitSlop={6}
+        >
+          <Text style={[lp.pillText, lang === code && lp.pillTextOn]}>{label}</Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+}
+
+const lp = StyleSheet.create({
+  wrap: {
+    flexDirection: 'row', gap: 2,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 20, padding: 2,
+  },
+  pill:        { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 18 },
+  pillOn:      { backgroundColor: 'rgba(255,255,255,0.15)' },
+  pillText:    { fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.35)', letterSpacing: 0.5 },
+  pillTextOn:  { color: '#FFFFFF' },
+});
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 export default function OnboardingCarouselScreen() {
-  const router     = useRouter();
-  const { width: W, height: H } = useWindowDimensions();
-  const insets     = useSafeAreaInsets();
-  const scrollRef  = useRef<ScrollView>(null);
+  const router    = useRouter();
+  const T         = useT();
+  const { width: W } = useWindowDimensions();
+  const insets    = useSafeAreaInsets();
+  const scrollRef = useRef<ScrollView>(null);
   const [page, setPage] = useState(0);
 
-  // Responsive dimensions
   const slideW   = Math.min(W, MAX_SLIDE_W);
-  const isNarrow = slideW < 360;                        // very small phone
+  const isNarrow = slideW < 360;
   const illusW   = slideW * 0.78;
-  const pH       = Math.max(24, insets.top);            // safe-area top pad
-  const hScale   = isNarrow ? 0.82 : 1;                // shrink headlines on tiny screens
+  const pH       = Math.max(24, insets.top);
+  const hScale   = isNarrow ? 0.82 : 1;
 
-  // Auth state
-  const [mode, setMode]             = useState<'login' | 'register'>('login');
-  const [email, setEmail]           = useState('');
-  const [password, setPassword]     = useState('');
-  const [name, setName]             = useState('');
+  const slides = [
+    { eyebrow: T.slide1_eyebrow, headline: T.slide1_headline, body: T.slide1_body, Illus: IllustrationControl },
+    { eyebrow: T.slide2_eyebrow, headline: T.slide2_headline, body: T.slide2_body, Illus: IllustrationBreakdown },
+    { eyebrow: T.slide3_eyebrow, headline: T.slide3_headline, body: T.slide3_body, Illus: IllustrationBudget },
+  ];
+
+  const [mode, setMode]               = useState<'login' | 'register'>('login');
+  const [email, setEmail]             = useState('');
+  const [password, setPassword]       = useState('');
+  const [name, setName]               = useState('');
   const [authLoading, setAuthLoading] = useState(false);
-  const [authError, setAuthError]   = useState('');
+  const [authError, setAuthError]     = useState('');
 
   const goToSlide = (i: number) => {
     scrollRef.current?.scrollTo({ x: i * slideW, animated: true });
@@ -209,13 +232,13 @@ export default function OnboardingCarouselScreen() {
       if (error) setAuthError(error.message);
       setAuthLoading(false);
     } else {
-      Alert.alert('Google вход', 'Доступен в следующем обновлении');
+      Alert.alert('Google', 'Available in the next update');
     }
   };
 
   const handleEmailAuth = async () => {
-    if (!email.trim() || !password.trim()) { setAuthError('Заполните все поля'); return; }
-    if (mode === 'register' && !name.trim()) { setAuthError('Введите имя'); return; }
+    if (!email.trim() || !password.trim()) { setAuthError(T.err_fill); return; }
+    if (mode === 'register' && !name.trim()) { setAuthError(T.err_name); return; }
     setAuthError('');
     setAuthLoading(true);
     try {
@@ -231,141 +254,149 @@ export default function OnboardingCarouselScreen() {
         router.replace('/onboarding-profile');
       }
     } catch (err: any) {
-      setAuthError(err.message || 'Ошибка. Попробуйте снова.');
+      setAuthError(err.message ?? 'Error. Please try again.');
     } finally {
       setAuthLoading(false);
     }
   };
 
   return (
-    // Full-screen black canvas — centers the fixed-width column
     <View style={s.canvas}>
-      {/* This View pins the width; the ScrollView fills it */}
       <View style={{ width: slideW, flex: 1 }}>
-      <ScrollView
-        ref={scrollRef}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        scrollEventThrottle={16}
-        onMomentumScrollEnd={onMomentumEnd}
-        bounces={false}
-        style={{ flex: 1 }}
-      >
-        {/* ── Feature slides ── */}
-        {SLIDES.map((slide, i) => (
-          <View key={i} style={[s.slide, { width: slideW, paddingTop: pH + 12 }]}>
-            {/* Skip */}
-            <TouchableOpacity style={s.skip} onPress={() => goToSlide(3)} hitSlop={12}>
-              <Text style={s.skipText}>Пропустить</Text>
-            </TouchableOpacity>
-
-            {/* Illustration */}
-            <View style={s.illusWrap}>
-              <slide.Illus w={illusW} />
-            </View>
-
-            {/* Copy */}
-            <View style={s.copy}>
-              <Text style={s.eyebrow}>{slide.eyebrow}</Text>
-              <Text style={[s.headline, { fontSize: t.d1.fontSize * hScale }]}>
-                {slide.headline}
-              </Text>
-              <Text style={s.body}>{slide.body}</Text>
-            </View>
-
-            {/* Footer */}
-            <View style={[s.footer, { paddingBottom: Math.max(32, insets.bottom + 16) }]}>
-              <Dots current={page} />
-              <TouchableOpacity style={s.nextBtn} onPress={() => goToSlide(i + 1)}>
-                <Text style={s.nextBtnText}>Далее</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ))}
-
-        {/* ── Auth slide ── */}
-        <KeyboardAvoidingView
-          style={{ width: slideW, flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        <ScrollView
+          ref={scrollRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          scrollEventThrottle={16}
+          onMomentumScrollEnd={onMomentumEnd}
+          bounces={false}
+          style={{ flex: 1 }}
         >
-          <ScrollView
-            contentContainerStyle={[
-              s.authSlide,
-              { paddingTop: pH + 8, paddingBottom: Math.max(40, insets.bottom + 16) },
-            ]}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            <TouchableOpacity style={s.backBtn} onPress={() => goToSlide(2)} hitSlop={12}>
-              <Text style={s.backBtnText}>←</Text>
-            </TouchableOpacity>
+          {/* ── Feature slides ── */}
+          {slides.map((slide, i) => (
+            <View key={i} style={[s.slide, { width: slideW, paddingTop: pH + 12 }]}>
 
-            <Text style={s.authLogo}>OptiSpend</Text>
-            <Text style={s.authTagline}>
-              {mode === 'login' ? 'Войдите в свой аккаунт' : 'Создайте аккаунт'}
-            </Text>
+              {/* Language picker — top left */}
+              <View style={[s.langPickerPos, { top: pH + 4 }]}>
+                <LangPicker />
+              </View>
 
-            {/* Mode toggle */}
-            <View style={s.modeToggle}>
-              {(['login', 'register'] as const).map((m) => (
-                <TouchableOpacity
-                  key={m}
-                  style={[s.modeBtn, mode === m && s.modeBtnOn]}
-                  onPress={() => { setMode(m); setAuthError(''); }}
-                >
-                  <Text style={[s.modeBtnText, mode === m && s.modeBtnTextOn]}>
-                    {m === 'login' ? 'Войти' : 'Регистрация'}
-                  </Text>
+              {/* Skip — top right */}
+              <TouchableOpacity style={[s.skip, { top: pH + 4 }]} onPress={() => goToSlide(3)} hitSlop={12}>
+                <Text style={s.skipText}>{T.skip}</Text>
+              </TouchableOpacity>
+
+              {/* Illustration */}
+              <View style={s.illusWrap}>
+                <slide.Illus w={illusW} />
+              </View>
+
+              {/* Copy */}
+              <View style={s.copy}>
+                <Text style={s.eyebrow}>{slide.eyebrow}</Text>
+                <Text style={[s.headline, { fontSize: t.d1.fontSize * hScale }]}>
+                  {slide.headline}
+                </Text>
+                <Text style={s.body}>{slide.body}</Text>
+              </View>
+
+              {/* Footer */}
+              <View style={[s.footer, { paddingBottom: Math.max(32, insets.bottom + 16) }]}>
+                <Dots current={page} />
+                <TouchableOpacity style={s.nextBtn} onPress={() => goToSlide(i + 1)}>
+                  <Text style={s.nextBtnText}>{T.next}</Text>
                 </TouchableOpacity>
-              ))}
+              </View>
             </View>
+          ))}
 
-            {/* Google */}
-            <TouchableOpacity style={s.googleBtn} onPress={handleGoogle} activeOpacity={0.85}>
-              <GoogleIcon />
-              <Text style={s.googleBtnText}>Продолжить с Google</Text>
-            </TouchableOpacity>
+          {/* ── Auth slide ── */}
+          <KeyboardAvoidingView
+            style={{ width: slideW, flex: 1 }}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          >
+            <ScrollView
+              contentContainerStyle={[
+                s.authSlide,
+                { paddingTop: pH + 8, paddingBottom: Math.max(40, insets.bottom + 16) },
+              ]}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              {/* Back + LangPicker row */}
+              <View style={s.authTopRow}>
+                <TouchableOpacity style={s.backBtn} onPress={() => goToSlide(2)} hitSlop={12}>
+                  <Text style={s.backBtnText}>{T.back}</Text>
+                </TouchableOpacity>
+                <LangPicker />
+              </View>
 
-            {/* Divider */}
-            <View style={s.divider}>
-              <View style={s.divLine} />
-              <Text style={s.divText}>или</Text>
-              <View style={s.divLine} />
-            </View>
+              <Text style={s.authLogo}>OptiSpend</Text>
+              <Text style={s.authTagline}>
+                {mode === 'login' ? T.auth_signin_tagline : T.auth_signup_tagline}
+              </Text>
 
-            {/* Fields */}
-            {mode === 'register' && (
-              <TextInput style={s.input} placeholder="Имя"
+              {/* Mode toggle */}
+              <View style={s.modeToggle}>
+                {(['login', 'register'] as const).map((m) => (
+                  <TouchableOpacity
+                    key={m}
+                    style={[s.modeBtn, mode === m && s.modeBtnOn]}
+                    onPress={() => { setMode(m); setAuthError(''); }}
+                  >
+                    <Text style={[s.modeBtnText, mode === m && s.modeBtnTextOn]}>
+                      {m === 'login' ? T.auth_signin_tab : T.auth_signup_tab}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Google */}
+              <TouchableOpacity style={s.googleBtn} onPress={handleGoogle} activeOpacity={0.85}>
+                <GoogleIcon />
+                <Text style={s.googleBtnText}>{T.google_btn}</Text>
+              </TouchableOpacity>
+
+              {/* Divider */}
+              <View style={s.divider}>
+                <View style={s.divLine} />
+                <Text style={s.divText}>{T.or}</Text>
+                <View style={s.divLine} />
+              </View>
+
+              {/* Fields */}
+              {mode === 'register' && (
+                <TextInput style={s.input} placeholder={T.field_name}
+                  placeholderTextColor="rgba(255,255,255,0.3)"
+                  value={name} onChangeText={setName} autoCapitalize="words" />
+              )}
+              <TextInput style={s.input} placeholder={T.field_email}
                 placeholderTextColor="rgba(255,255,255,0.3)"
-                value={name} onChangeText={setName} autoCapitalize="words" />
-            )}
-            <TextInput style={s.input} placeholder="Email"
-              placeholderTextColor="rgba(255,255,255,0.3)"
-              value={email} onChangeText={setEmail}
-              keyboardType="email-address" autoCapitalize="none" autoCorrect={false} />
-            <TextInput style={s.input} placeholder="Пароль"
-              placeholderTextColor="rgba(255,255,255,0.3)"
-              value={password} onChangeText={setPassword} secureTextEntry />
+                value={email} onChangeText={setEmail}
+                keyboardType="email-address" autoCapitalize="none" autoCorrect={false} />
+              <TextInput style={s.input} placeholder={T.field_password}
+                placeholderTextColor="rgba(255,255,255,0.3)"
+                value={password} onChangeText={setPassword} secureTextEntry />
 
-            {!!authError && <Text style={s.errText}>{authError}</Text>}
+              {!!authError && <Text style={s.errText}>{authError}</Text>}
 
-            <TouchableOpacity style={s.submitBtn} onPress={handleEmailAuth}
-              activeOpacity={0.85} disabled={authLoading}>
-              {authLoading
-                ? <ActivityIndicator color="#fff" />
-                : <Text style={s.submitBtnText}>
-                    {mode === 'login' ? 'Войти' : 'Создать аккаунт'}
-                  </Text>
-              }
-            </TouchableOpacity>
+              <TouchableOpacity style={s.submitBtn} onPress={handleEmailAuth}
+                activeOpacity={0.85} disabled={authLoading}>
+                {authLoading
+                  ? <ActivityIndicator color="#fff" />
+                  : <Text style={s.submitBtnText}>
+                      {mode === 'login' ? T.submit_signin : T.submit_signup}
+                    </Text>
+                }
+              </TouchableOpacity>
 
-            <View style={{ marginTop: 32, alignItems: 'center' }}>
-              <Dots current={3} />
-            </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </ScrollView>
+              <View style={{ marginTop: 32, alignItems: 'center' }}>
+                <Dots current={3} />
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </ScrollView>
       </View>
     </View>
   );
@@ -373,30 +404,22 @@ export default function OnboardingCarouselScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  // Full-screen black canvas, centers the max-width column
   canvas: {
-    flex: 1,
-    backgroundColor: '#000000',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flex: 1, backgroundColor: '#000000',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  slide: {
+    flex: 1, backgroundColor: '#000000', paddingHorizontal: 28,
   },
 
-  // Feature slide
-  slide: {
-    flex: 1,
-    backgroundColor: '#000000',
-    paddingHorizontal: 28,
-  },
+  // Top controls
+  langPickerPos: { position: 'absolute', left: 20, zIndex: 10 },
   skip: {
-    position: 'absolute',
-    top: 56,
-    right: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    zIndex: 10,
+    position: 'absolute', right: 20,
+    paddingVertical: 8, paddingHorizontal: 4, zIndex: 10,
   },
   skipText:       { ...t.sm, color: 'rgba(255,255,255,0.4)' },
-  illusWrap:      { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 40 },
+  illusWrap:      { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 48 },
   copy:           { paddingBottom: 8 },
   eyebrow:        { ...t.xsMd, color: '#3B82F6', letterSpacing: 2, marginBottom: 12 },
   headline:       { ...t.d1, color: '#FFFFFF', marginBottom: 14 },
@@ -405,17 +428,16 @@ const s = StyleSheet.create({
   dots:           { flexDirection: 'row', alignItems: 'center', gap: 6 },
   dot:            { height: 5, borderRadius: 3 },
   dotOn:          { width: 24, backgroundColor: '#3B82F6' },
-  dotOff:         { width: 5,  backgroundColor: 'rgba(255,255,255,0.2)' },
+  dotOff:         { width: 5, backgroundColor: 'rgba(255,255,255,0.2)' },
   nextBtn:        { backgroundColor: '#2563EB', paddingHorizontal: 28, paddingVertical: 14, borderRadius: radius.full },
   nextBtnText:    { ...t.bodyMd, color: '#FFFFFF' },
 
   // Auth slide
   authSlide: {
-    backgroundColor: '#000000',
-    paddingHorizontal: 28,
-    minHeight: '100%',
+    backgroundColor: '#000000', paddingHorizontal: 28, minHeight: '100%',
   },
-  backBtn:         { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', marginBottom: 28 },
+  authTopRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 },
+  backBtn:         { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   backBtnText:     { fontSize: 22, color: 'rgba(255,255,255,0.4)' },
   authLogo:        { ...t.h1, color: '#FFFFFF', marginBottom: 6 },
   authTagline:     { ...t.body, color: 'rgba(255,255,255,0.45)', marginBottom: 28 },

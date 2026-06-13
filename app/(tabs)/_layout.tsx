@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Path, Circle, Line, Rect, Polyline } from 'react-native-svg';
 import { colors, type as t, radius } from '../../src/lib/theme';
+import { useT } from '../../src/lib/i18n';
 
 const C_ON  = colors.accent;
 const C_OFF = 'rgba(0,0,0,0.28)';
@@ -62,6 +63,7 @@ function Tab({
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
 export default function TabsLayout() {
+  const T = useT();
   return (
     <Tabs
       screenOptions={{
@@ -71,15 +73,15 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name="index"
-        options={{ tabBarIcon: ({ focused }) => <Tab label="Главная" focused={focused} Icon={({ on }) => <HomeIcon on={on} />} /> }} />
+        options={{ tabBarIcon: ({ focused }) => <Tab label={T.tab_home} focused={focused} Icon={({ on }) => <HomeIcon on={on} />} /> }} />
       <Tabs.Screen name="leaks"
-        options={{ tabBarIcon: ({ focused }) => <Tab label="Утечки" focused={focused} Icon={({ on }) => <LeaksIcon on={on} />} /> }} />
+        options={{ tabBarIcon: ({ focused }) => <Tab label={T.tab_leaks} focused={focused} Icon={({ on }) => <LeaksIcon on={on} />} /> }} />
       <Tabs.Screen name="advisor"
-        options={{ tabBarIcon: ({ focused }) => <Tab label="Советник" focused={focused} Icon={({ on }) => <AdvisorIcon on={on} />} /> }} />
+        options={{ tabBarIcon: ({ focused }) => <Tab label={T.tab_advisor} focused={focused} Icon={({ on }) => <AdvisorIcon on={on} />} /> }} />
       <Tabs.Screen name="reports"
-        options={{ tabBarIcon: ({ focused }) => <Tab label="Отчёты" focused={focused} Icon={({ on }) => <ReportsIcon on={on} />} /> }} />
+        options={{ tabBarIcon: ({ focused }) => <Tab label={T.tab_reports} focused={focused} Icon={({ on }) => <ReportsIcon on={on} />} /> }} />
       <Tabs.Screen name="goals"
-        options={{ tabBarIcon: ({ focused }) => <Tab label="Цели" focused={focused} Icon={({ on }) => <GoalsIcon on={on} />} /> }} />
+        options={{ tabBarIcon: ({ focused }) => <Tab label={T.tab_goals} focused={focused} Icon={({ on }) => <GoalsIcon on={on} />} /> }} />
     </Tabs>
   );
 }
