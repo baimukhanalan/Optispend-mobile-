@@ -35,6 +35,14 @@ export const colors = {
   dangerLight:  '#FEF2F2',
   warning:      '#D97706',
   warningLight: '#FFFBEB',
+
+  // Backward-compat aliases (old screens)
+  background:  '#F5F5F7',
+  card:        '#FFFFFF',
+  softBlue:    '#EFF6FF',
+  softGreen:   '#F0FDF4',
+  softYellow:  '#FFFBEB',
+  softRed:     '#FEF2F2',
 } as const;
 
 export const spacing = {
@@ -116,5 +124,41 @@ export const shadow = {
   },
 } as const;
 
+// ─── Backward-compat aliases (old screens use these names) ────────────────────
+// Old color names → new tokens
+export const legacyColors = {
+  background:  colors.bg,
+  card:        colors.surface,
+  softBlue:    colors.accentLight,
+  softGreen:   colors.successLight,
+  softYellow:  colors.warningLight,
+  softRed:     colors.dangerLight,
+  secondary:   colors.secondary,
+  muted:       colors.muted,
+};
+
+// Old `typography` export
+export const typography = {
+  h1:        type.h1,
+  h2:        type.h2,
+  h3:        type.h3,
+  h4:        type.h4,
+  body:      type.body,
+  bodySmall: type.sm,
+  caption:   type.xs,
+  label:     type.xsMd,
+};
+
+// Old `shadows` export
+export const shadows = { card: shadow.xs };
+
 // Legacy compat — screens that still use the old { theme } import
-export const theme = { colors, spacing, radius, fonts, type, shadow } as const;
+export const theme = {
+  colors: { ...colors, ...legacyColors },
+  spacing,
+  radius,
+  fonts,
+  type,
+  typography,
+  shadow,
+} as const;
