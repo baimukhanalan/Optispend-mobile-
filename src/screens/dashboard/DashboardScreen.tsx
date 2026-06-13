@@ -8,9 +8,13 @@ import {
   RefreshControl,
   Animated,
   Platform,
+  useWindowDimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path, Rect, Line, Circle } from 'react-native-svg';
+
+const MAX_CONTENT_W = 680;
 import { colors, type as t, radius, shadow, spacing } from '../../lib/theme';
 import { formatMoney, formatRelativeDate } from '../../lib/format';
 import { useAuthStore } from '../../store/auth';
@@ -64,7 +68,9 @@ const CAT_COLORS: Record<string, string> = {
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 export default function DashboardScreen() {
-  const router = useRouter();
+  const router   = useRouter();
+  const { width: W } = useWindowDimensions();
+  const insets   = useSafeAreaInsets();
   const { user, profile } = useAuthStore();
   const { expenses, todayExpenses, loading, fetchExpenses, fetchDailySnapshot, getSafeToSpend } = useExpensesStore();
 
@@ -105,14 +111,17 @@ export default function DashboardScreen() {
 
   const recentExpenses = expenses.slice(0, 6);
 
+  const contentW = Math.min(W, MAX_CONTENT_W);
+  const topPad   = Math.max(16, insets.top);
+
   return (
     <ScrollView
       style={styles.root}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { alignItems: 'center', paddingTop: topPad }]}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
       showsVerticalScrollIndicator={false}
     >
-      <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+      <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }], width: contentW }}>
 
         {/* ── Header ── */}
         <View style={styles.header}>
@@ -267,7 +276,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
-    paddingTop: Platform.OS === 'ios' ? 12 : 20,
   },
   dateLabel: {
     ...t.sm,
