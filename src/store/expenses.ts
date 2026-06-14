@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { Expense, ExpenseCategory, DailySnapshot } from '../types';
 import { getWeekRange, getMonthRange } from '../lib/format';
+import { MOCK_EXPENSES } from '../lib/mockdb';
 
 interface ExpensesState {
   expenses: Expense[];
@@ -11,6 +12,7 @@ interface ExpensesState {
   dailySnapshot: DailySnapshot | null;
   loading: boolean;
   error: string | null;
+  loadMockData: () => void;
   fetchExpenses: (userId: string) => Promise<void>;
   addExpense: (expense: Omit<Expense, 'id' | 'created_at'>) => Promise<void>;
   deleteExpense: (id: string) => Promise<void>;
@@ -29,6 +31,20 @@ export const useExpensesStore = create<ExpensesState>((set, get) => ({
   dailySnapshot: null,
   loading: false,
   error: null,
+
+  loadMockData: () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const { start: weekStart } = getWeekRange();
+    const { start: monthStart } = getMonthRange();
+    const all = [...MOCK_EXPENSES].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    set({
+      expenses: all,
+      monthExpenses: all.filter((e) => new Date(e.date) >= monthStart),
+      weekExpenses: all.filter((e) => new Date(e.date) >= weekStart),
+      todayExpenses: all.filter((e) => new Date(e.date) >= today),
+    });
+  },
 
   fetchExpenses: async (userId) => {
     set({ loading: true, error: null });

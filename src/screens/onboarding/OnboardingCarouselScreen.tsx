@@ -22,6 +22,9 @@ import { colors, type as t, radius } from '@/lib/theme';
 import { supabase } from '@/lib/supabase';
 import { useT, useLangStore } from '@/lib/i18n';
 import type { Lang } from '@/store/lang';
+import { IS_MOCK } from '@/lib/mockdb';
+import { useAuthStore } from '@/store/auth';
+import { useExpensesStore } from '@/store/expenses';
 
 const SLIDE_COUNT   = 4;
 const MAX_SLIDE_W   = 480;
@@ -223,6 +226,12 @@ export default function OnboardingCarouselScreen() {
   };
 
   const handleGoogle = async () => {
+    if (IS_MOCK) {
+      useAuthStore.getState().loginMock();
+      useExpensesStore.getState().loadMockData();
+      router.replace('/(tabs)/');
+      return;
+    }
     if (Platform.OS === 'web') {
       setAuthLoading(true);
       const { error } = await supabase.auth.signInWithOAuth({
@@ -241,6 +250,16 @@ export default function OnboardingCarouselScreen() {
     if (mode === 'register' && !name.trim()) { setAuthError(T.err_name); return; }
     setAuthError('');
     setAuthLoading(true);
+
+    // ── Mock mode: no real Supabase project yet ──
+    if (IS_MOCK) {
+      useAuthStore.getState().loginMock();
+      useExpensesStore.getState().loadMockData();
+      setAuthLoading(false);
+      router.replace('/(tabs)/');
+      return;
+    }
+
     try {
       if (mode === 'login') {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
