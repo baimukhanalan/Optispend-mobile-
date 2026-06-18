@@ -1,54 +1,150 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator,
+  ActivityIndicator,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
-import * as Haptics from 'expo-haptics';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/auth';
-import { AIAdvice, CATEGORY_LABELS } from '../../types';
-import { Card } from '../../components/ui/Card';
-import { Button } from '../../components/ui/Button';
-import { colors, typography } from '../../lib/theme';
-import { formatMoney } from '../../lib/format';
+import { ChatMessage } from '../../types';
+import { colors, radius, shadow, type as t } from '../../lib/theme';
+
+const WELCOME: ChatMessage = {
+  id: '__welcome__',
+  session_id: '',
+  user_id: '',
+  role: 'assistant',
+  content: 'Привет! Я ваш AI финансовый советник.\n\nЗадайте любой вопрос о расходах, или нажмите «📊 Анализ» для полного разбора финансов этого месяца.',
+  created_at: new Date().toISOString(),
+};
 
 export default function AIAdvisorScreen() {
-  const { user, profile } = useAuthStore();
-  const [advice, setAdvice] = useState<AIAdvice | null>(null);
+  const { user } = useAuthStore();
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([WELCOME]);
+  const [input, setInput] = useState('');
   const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
+  const [sending, setSending] = useState(false);
+  const listRef = useRef<FlatList>(null);
 
-  const loadAdvice = async () => {
+  const scrollToBottom = useCallback(() => {
+    setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+  }, []);
+
+  const initSession = useCallback(async () => {
     if (!user) return;
-    const { data } = await supabase
-      .from('ai_recommendations')
-      .select('*')
+
+    let sid: string | null = null;
+
+    const { data: existing } = await supabase
+      .from('ai_chat_sessions')
+      .select('id')
       .eq('user_id', user.id)
-      .order('generated_at', { ascending: false })
+      .order('updated_at', { ascending: false })
       .limit(1)
-      .single();
-    if (data) setAdvice(data as AIAdvice);
-  };
+      .maybeSingle();
+
+    if (existing) {
+      sid = existing.id;
+    } else {
+      const { data: created } = await supabase
+        .from('ai_chat_sessions')
+        .insert({ user_id: user.id })
+        .select('id')
+        .single();
+      sid = created?.id ?? null;
+    }
+
+    if (!sid) return;
+    setSessionId(sid);
+
+    const { data: msgs } = await supabase
+      .from('ai_chat_messages')
+      .select('*')
+      .eq('session_id', sid)
+      .order('created_at', { ascending: true });
+
+    if (msgs && msgs.length > 0) {
+      setMessages(msgs as ChatMessage[]);
+    }
+  }, [user]);
 
   useEffect(() => {
     setLoading(true);
-    loadAdvice().finally(() => setLoading(false));
-  }, [user]);
+    initSession().finally(() => setLoading(false));
+  }, [initSession]);
 
-  const generate = async () => {
-    if (!user) return;
-    setGenerating(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  const sendMessage = useCallback(async (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed || !user || !sessionId || sending) return;
+
+    setInput('');
+    setSending(true);
+
+    // Optimistic update — show user bubble immediately
+    const tempId = `__temp__${Date.now()}`;
+    const optimistic: ChatMessage = {
+      id: tempId,
+      session_id: sessionId,
+      user_id: user.id,
+      role: 'user',
+      content: trimmed,
+      created_at: new Date().toISOString(),
+    };
+
+    setMessages(prev => {
+      const base = prev.filter(m => m.id !== WELCOME.id);
+      return [...base, optimistic];
+    });
+    scrollToBottom();
+
     try {
-      const { data, error } = await supabase.functions.invoke('generate-ai-advice', {
-        body: { user_id: user.id },
+      const { error } = await supabase.functions.invoke('ai-chat', {
+        body: { user_id: user.id, session_id: sessionId, message: trimmed },
       });
       if (error) throw error;
-      if (data) setAdvice(data as AIAdvice);
+
+      // Reload from DB to replace temp message + get AI reply
+      const { data: msgs } = await supabase
+        .from('ai_chat_messages')
+        .select('*')
+        .eq('session_id', sessionId)
+        .order('created_at', { ascending: true });
+
+      if (msgs) setMessages(msgs as ChatMessage[]);
+    } catch {
+      setMessages(prev => prev.filter(m => m.id !== tempId));
+      setInput(trimmed);
     } finally {
-      setGenerating(false);
+      setSending(false);
+      scrollToBottom();
     }
-  };
+  }, [user, sessionId, sending, scrollToBottom]);
+
+  const renderMessage = useCallback(({ item }: { item: ChatMessage }) => {
+    const isUser = item.role === 'user';
+    return (
+      <View style={[styles.row, isUser && styles.rowUser]}>
+        {!isUser && (
+          <View style={styles.avatar}>
+            <Text style={styles.avatarEmoji}>🧠</Text>
+          </View>
+        )}
+        <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleAI]}>
+          <Text style={[styles.bubbleText, isUser && styles.bubbleTextUser]}>
+            {item.content}
+          </Text>
+        </View>
+      </View>
+    );
+  }, []);
 
   if (loading) {
     return (
@@ -59,173 +155,184 @@ export default function AIAdvisorScreen() {
   }
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+    <SafeAreaView style={styles.root}>
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.aiIcon}>
-          <Text style={{ fontSize: 20 }}>🧠</Text>
+        <View style={styles.headerIcon}>
+          <Text style={{ fontSize: 18 }}>🧠</Text>
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.title}>AI Советник</Text>
-          <Text style={styles.sub}>
-            {advice ? `Обновлено ${new Date(advice.generated_at).toLocaleDateString('ru-KZ')}` : 'Готов к анализу'}
-          </Text>
+        <View>
+          <Text style={styles.headerTitle}>AI Советник</Text>
+          <Text style={styles.headerSub}>Финансовый ассистент</Text>
         </View>
-        <Button
-          onPress={generate}
-          label={generating ? '...' : '↻ Обновить'}
-          variant="secondary"
-          size="sm"
-          loading={generating}
-        />
       </View>
 
-      {!advice ? (
-        <Card>
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>💡</Text>
-            <Text style={styles.emptyTitle}>Запустите анализ</Text>
-            <Text style={styles.emptySub}>AI проанализирует ваши расходы и даст конкретные рекомендации с цифрами.</Text>
-            <Button onPress={generate} label="Запустить анализ" loading={generating} style={{ marginTop: 16, width: '100%' }} />
-          </View>
-        </Card>
-      ) : (
-        <>
-          {/* Main conclusion */}
-          <Animated.View entering={FadeInDown.duration(400)}>
-            <Card variant="danger" style={{ borderLeftWidth: 3, borderLeftColor: colors.danger, borderRadius: 0, borderTopRightRadius: 16, borderBottomRightRadius: 16 }}>
-              <View style={styles.labelRow}>
-                <View style={[styles.label, { backgroundColor: '#FEE2E2' }]}>
-                  <Text style={[styles.labelText, { color: '#991B1B' }]}>⚠ Главный вывод</Text>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 94 : 0}
+      >
+        <FlatList
+          ref={listRef}
+          data={messages}
+          keyExtractor={item => item.id}
+          renderItem={renderMessage}
+          contentContainerStyle={styles.list}
+          onContentSizeChange={scrollToBottom}
+          showsVerticalScrollIndicator={false}
+          ListFooterComponent={
+            sending ? (
+              <View style={styles.row}>
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarEmoji}>🧠</Text>
+                </View>
+                <View style={[styles.bubble, styles.bubbleAI, styles.typingBubble]}>
+                  <ActivityIndicator size="small" color={colors.secondary} />
                 </View>
               </View>
-              <Text style={styles.conclusionText}>{advice.main_conclusion}</Text>
-            </Card>
-          </Animated.View>
+            ) : null
+          }
+        />
 
-          {/* Top leaks */}
-          <Animated.View entering={FadeInDown.duration(400).delay(80)}>
-            <Card>
-              <View style={styles.labelRow}>
-                <View style={[styles.label, { backgroundColor: colors.softYellow }]}>
-                  <Text style={[styles.labelText, { color: '#92400E' }]}>📈 Топ-3 утечки</Text>
-                </View>
-              </View>
-              {advice.top_leaks.map((leak, i) => (
-                <View key={i} style={styles.leakRow}>
-                  <Text style={styles.leakCat}>{CATEGORY_LABELS[leak.category]}</Text>
-                  <Text style={[styles.leakAmt, { color: i === 0 ? colors.danger : colors.warning }]}>
-                    {formatMoney(leak.amount)}
-                  </Text>
-                </View>
-              ))}
-            </Card>
-          </Animated.View>
+        <View style={styles.inputBar}>
+          <TouchableOpacity
+            style={styles.analysisBtn}
+            onPress={() => sendMessage('Проанализируй мои расходы за текущий месяц')}
+            disabled={sending}
+            activeOpacity={0.75}
+          >
+            <Text style={styles.analysisBtnText}>📊 Анализ</Text>
+          </TouchableOpacity>
 
-          {/* What to cut */}
-          <Animated.View entering={FadeInDown.duration(400).delay(160)}>
-            <Card>
-              <View style={styles.labelRow}>
-                <View style={[styles.label, { backgroundColor: colors.softYellow }]}>
-                  <Text style={[styles.labelText, { color: '#92400E' }]}>✂ На этой неделе сократить</Text>
-                </View>
-              </View>
-              <Text style={styles.bodyText}>{advice.what_to_cut_this_week}</Text>
-            </Card>
-          </Animated.View>
+          <TextInput
+            style={styles.input}
+            value={input}
+            onChangeText={setInput}
+            placeholder="Задать вопрос..."
+            placeholderTextColor={colors.placeholder}
+            multiline
+            maxLength={500}
+            returnKeyType="send"
+            blurOnSubmit
+            onSubmitEditing={() => sendMessage(input)}
+          />
 
-          {/* Safe to save */}
-          <Animated.View entering={FadeInDown.duration(400).delay(240)}>
-            <Card variant="success">
-              <View style={styles.labelRow}>
-                <View style={[styles.label, { backgroundColor: '#BBF7D0' }]}>
-                  <Text style={[styles.labelText, { color: '#14532D' }]}>🐷 Безопасно отложить</Text>
-                </View>
-              </View>
-              <Text style={styles.saveAmount}>{formatMoney(advice.safe_to_save)}</Text>
-              <Text style={styles.saveNote}>При сокращении выявленных утечек.</Text>
-            </Card>
-          </Animated.View>
-
-          {/* Debt advice */}
-          <Animated.View entering={FadeInDown.duration(400).delay(320)}>
-            <Card>
-              <View style={styles.labelRow}>
-                <View style={[styles.label, { backgroundColor: colors.softBlue }]}>
-                  <Text style={[styles.labelText, { color: '#1E3A8A' }]}>💳 Долги</Text>
-                </View>
-              </View>
-              <Text style={styles.bodyText}>{advice.debt_advice}</Text>
-            </Card>
-          </Animated.View>
-
-          {/* Investment */}
-          {advice.investment_advice && (
-            <Animated.View entering={FadeInDown.duration(400).delay(400)}>
-              <Card>
-                <View style={styles.labelRow}>
-                  <View style={[styles.label, { backgroundColor: advice.can_invest ? '#BBF7D0' : '#FEE2E2' }]}>
-                    <Text style={[styles.labelText, { color: advice.can_invest ? '#14532D' : '#991B1B' }]}>
-                      {advice.can_invest ? '📈 Инвестиции' : '🚫 Инвестиции'}
-                    </Text>
-                  </View>
-                </View>
-                <Text style={styles.bodyText}>{advice.investment_advice}</Text>
-              </Card>
-            </Animated.View>
-          )}
-
-          {/* Cannot do */}
-          <Animated.View entering={FadeInDown.duration(400).delay(480)}>
-            <Card variant="danger">
-              <View style={styles.labelRow}>
-                <View style={[styles.label, { backgroundColor: '#FEE2E2' }]}>
-                  <Text style={[styles.labelText, { color: '#991B1B' }]}>🚫 Нельзя делать</Text>
-                </View>
-              </View>
-              {advice.forbidden_actions.map((action, i) => (
-                <View key={i} style={styles.forbidRow}>
-                  <Text style={styles.forbidX}>✕</Text>
-                  <Text style={styles.forbidText}>{action}</Text>
-                </View>
-              ))}
-            </Card>
-          </Animated.View>
-
-          <Text style={styles.disclaimer}>{advice.disclaimer}</Text>
-        </>
-      )}
-    </ScrollView>
+          <TouchableOpacity
+            style={[styles.sendBtn, (!input.trim() || sending) && styles.sendBtnOff]}
+            onPress={() => sendMessage(input)}
+            disabled={!input.trim() || sending}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.sendIcon}>↑</Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
-  content: { padding: 16, paddingBottom: 100 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
-  aiIcon: {
-    width: 44, height: 44, borderRadius: 12,
-    backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center',
+  root:  { flex: 1, backgroundColor: colors.bg },
+  flex:  { flex: 1 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
+
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    ...shadow.xs,
   },
-  title: { ...typography.h3 },
-  sub: { ...typography.caption, marginTop: 2 },
-  labelRow: { marginBottom: 8 },
-  label: { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 7 },
-  labelText: { fontSize: 11, fontWeight: '600', letterSpacing: 0.3 },
-  conclusionText: { fontSize: 14, color: colors.text, lineHeight: 21 },
-  leakRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 5 },
-  leakCat: { fontSize: 14, color: colors.text },
-  leakAmt: { fontSize: 14, fontWeight: '600' },
-  bodyText: { fontSize: 14, color: colors.text, lineHeight: 21 },
-  saveAmount: { fontSize: 26, fontWeight: '600', color: '#15803D', letterSpacing: -0.5, marginVertical: 2 },
-  saveNote: { fontSize: 13, color: '#166534' },
-  forbidRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-start', marginTop: 6 },
-  forbidX: { fontSize: 13, color: colors.danger, marginTop: 2 },
-  forbidText: { fontSize: 13, color: colors.text, flex: 1 },
-  disclaimer: { fontSize: 11, color: colors.muted, textAlign: 'center', paddingVertical: 16, lineHeight: 16 },
-  emptyState: { alignItems: 'center', paddingVertical: 20 },
-  emptyIcon: { fontSize: 44, marginBottom: 12 },
-  emptyTitle: { ...typography.h4, marginBottom: 8 },
-  emptySub: { ...typography.bodySmall, textAlign: 'center', lineHeight: 20 },
+  headerIcon: {
+    width: 40, height: 40, borderRadius: radius.md,
+    backgroundColor: colors.accentLight,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  headerTitle: { ...t.h4, color: colors.text },
+  headerSub:   { ...t.xs, color: colors.muted, marginTop: 1 },
+
+  list: { paddingHorizontal: 12, paddingVertical: 16, gap: 12 },
+
+  row:     { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
+  rowUser: { flexDirection: 'row-reverse' },
+
+  avatar: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: colors.accentLight,
+    alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
+  },
+  avatarEmoji: { fontSize: 16 },
+
+  bubble: {
+    maxWidth: '78%',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: radius.lg,
+  },
+  bubbleAI: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderBottomLeftRadius: radius.xs,
+    ...shadow.xs,
+  },
+  bubbleUser: {
+    backgroundColor: colors.accent,
+    borderBottomRightRadius: radius.xs,
+  },
+  bubbleText:     { ...t.body, color: colors.text, lineHeight: 21 },
+  bubbleTextUser: { color: '#fff' },
+
+  typingBubble: { paddingVertical: 14, paddingHorizontal: 20 },
+
+  inputBar: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    paddingBottom: Platform.OS === 'ios' ? 10 : 12,
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  analysisBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: radius.sm,
+    backgroundColor: colors.accentLight,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    alignSelf: 'flex-end',
+  },
+  analysisBtnText: { ...t.smMd, color: colors.accent },
+
+  input: {
+    flex: 1,
+    ...t.body,
+    color: colors.text,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 10,
+    maxHeight: 120,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+
+  sendBtn: {
+    width: 38, height: 38,
+    borderRadius: 19,
+    backgroundColor: colors.accent,
+    alignItems: 'center', justifyContent: 'center',
+    alignSelf: 'flex-end',
+  },
+  sendBtnOff: { backgroundColor: colors.border },
+  sendIcon: { fontSize: 18, color: '#fff', fontWeight: '700', marginTop: -1 },
 });
